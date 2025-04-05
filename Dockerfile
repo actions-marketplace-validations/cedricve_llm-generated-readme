@@ -7,5 +7,6 @@ COPY autofill_description.py /action/autofill_description.py
 COPY requirements.txt /action/requirements.txt
 RUN pip3 install -r /action/requirements.txt
 RUN chmod +x /action/entrypoint.sh
+RUN chmod +x /action/autofill_description.py
 
 ENTRYPOINT ["/action/entrypoint.sh"]
