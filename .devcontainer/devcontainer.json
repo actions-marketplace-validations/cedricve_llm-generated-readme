@@ -1,0 +1,21 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+	"name": "Python 3",
+	"dockerFile": "Dockerfile",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"GitHub.copilot",
+				"ms-python.python",
+				"ms-python.debugpy",
+				"ms-python.vscode-pylance",
+				"ms-python.pylint"
+			]
+		}
+	},
+	"features": {
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    },
+	"postCreateCommand": "python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt && apt install -y curl && curl -fsSL https://raw.githubusercontent.com/nektos/act/master/install.sh | bash && mv bin/act /usr/local/bin/act && chmod +x /usr/local/bin/act",
+}
