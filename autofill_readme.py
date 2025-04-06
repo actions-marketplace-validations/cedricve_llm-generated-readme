@@ -176,7 +176,7 @@ def main():
     pull_request_title = pull_request_data["title"]
 
     pull_request_files = []
-    
+
     # Request a maximum of 10 pages (300 files)
     for page_num in range(1, 11):
         pull_request_api_url = f"{pull_request_api_url}/files?page={page_num}&per_page=30"
@@ -198,6 +198,8 @@ def main():
             break
 
         pull_request_files.extend(pull_files_chunk)
+        
+    print(pull_request_files)
 
     for pull_request_file in pull_request_files:
         # Not all PR file metadata entries may contain a patch section

@@ -4,7 +4,7 @@ set -eu
 
 
 # Set fake value
-pull_request_id="0"
+pull_request_id="1"
 
 /action/autofill_readme.py \
   --github-api-url "$GITHUB_API_URL" \
