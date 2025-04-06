@@ -6,6 +6,7 @@ import json
 import openai
 from openai import AzureOpenAI
 import os
+import base64
 
 SAMPLE_PROMPT = """
 Write a pull request description focusing on the motivation behind the change and why it improves the project.
@@ -124,8 +125,6 @@ def main():
     azure_openai_endpoint = args.azure_openai_endpoint
     azure_openai_version = args.azure_openai_version
 
-    print("yolo")
-
     allowed_users = os.environ.get("INPUT_ALLOWED_USERS", "")
     if allowed_users:
         allowed_users = allowed_users.split(",")
@@ -145,72 +144,74 @@ def main():
         "Authorization": "token %s" % github_token,
     }
 
-    pull_request_api_url = f"{github_api_url}/repos/{repo}/pulls/{pull_request_id}"
-    pull_request_result = requests.get(
-        pull_request_api_url,
-        headers=authorization_header,
-    )
-    if pull_request_result.status_code != requests.codes.ok:
-        print(
-            "Request to get pull request data failed: "
-            + str(pull_request_result.status_code)
+    # Get all files in the main branch
+    repo_contents_url = f"{github_api_url}/repos/{repo}/contents"
+    files = []
+
+    def fetch_files(url):
+        response = requests.get(url, headers=authorization_header)
+        if response.status_code != 200:
+            print(f"Failed to fetch files: {response.status_code}, {response.text}")
+            return 
+        items = response.json()
+        for item in items:
+            if item["type"] == "file":
+                files.append(item["path"])
+            elif item["type"] == "dir":
+                fetch_files(item["url"])
+
+    fetch_files(repo_contents_url)
+
+    # Filter out .git, .devcontainer, .github, .venv, *.yml, Dockerfile, and .env files
+    files = [
+        file for file in files
+        if not (
+            file.endswith(".git")
+            or file.endswith(".devcontainer")
+            or file.endswith(".github")
+            or file.endswith(".venv")
+            or file.endswith(".yml")
+            or file.endswith("Dockerfile")
+            or file.endswith(".env")
         )
-        print("Response: " + pull_request_result.text)
-        return 1
-    pull_request_data = json.loads(pull_request_result.text)
+    ]
 
-    overwrite_description = os.environ.get(
-        "INPUT_OVERWRITE_DESCRIPTION", "false")
-    if pull_request_data["body"] and overwrite_description.lower() == "false":
-        print("Pull request already has a description, skipping")
-        return 0
-
-    if allowed_users:
-        pr_author = pull_request_data["user"]["login"]
-        if pr_author not in allowed_users:
-            print(
-                f"Pull request author {pr_author} is not allowed to trigger this action"
-            )
-            return 0
-
-    pull_request_title = pull_request_data["title"]
-
-    pull_request_files = []
-
-    # Request a maximum of 10 pages (300 files)
-    for page_num in range(1, 11):
-        pull_request_api_url = f"{pull_request_api_url}/files?page={page_num}&per_page=30"
-        pull_files_result = requests.get(
-            pull_request_api_url,
-            headers=authorization_header,
-        )
-
-        if pull_files_result.status_code != requests.codes.ok:
-            print(
-                "Request to get list of files failed with error code: "
-                + str(pull_files_result.status_code)
-            )
-            return 1
-
-        pull_files_chunk = json.loads(pull_files_result.text)
-
-        if len(pull_files_chunk) == 0:
-            break
-
-        pull_request_files.extend(pull_files_chunk)
-        
-    print(pull_request_files)
-
-    for pull_request_file in pull_request_files:
-        # Not all PR file metadata entries may contain a patch section
-        # For example, entries related to removed binary files may not contain it
-        if "patch" not in pull_request_file:
+    decoded_files = []
+    for file in files:
+        # Get the content of the file
+        file_url = f"{github_api_url}/repos/{repo}/contents/{file}"
+        file_response = requests.get(file_url, headers=authorization_header)
+        if file_response.status_code != 200:
+            print(f"Failed to fetch file: {file_response.status_code}, {file_response.text}")
             continue
+        file_content = file_response.json()
+        file_content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
+        decoded_files.append(file_content_decoded)
+    
+    # Extract functions from the files
+    for file in decoded_files:
+        # Extract functions from the file content
+        lines = file.split("\n")
+        for index, line in enumerate(lines):
+            # for Python, we can use the keyword 'def' to identify functions
+            if line.strip().startswith("def "):
+                function_name = line.strip().split("(")[0][4:]
+                completion_prompt += f"Function: {function_name}\n"
+                # Get first 10 lines of the function
+                function_lines = lines[index:index+100]
+                completion_prompt += f"Function lines: {function_lines}\n"
 
-        filename = pull_request_file["filename"]
-        patch = pull_request_file["patch"]
-        completion_prompt += f"Changes in file {filename}: {patch}\n"
+            # for Golang, we can use the keyword 'func' to identify functions
+            elif line.strip().startswith("func "):
+                function_name = line.strip().split("(")[0][5:]
+                completion_prompt += f"Function: {function_name}\n"
+                function_lines = lines[index:index+100]
+                completion_prompt += f"Function lines: {function_lines}\n"
 
+    print(f"Completion prompt: {completion_prompt}")
+
+
+    #completion_prompt += f"Changes in file {filename}: {patch}\n"
     max_allowed_tokens = 8000
     characters_per_token = 4  # The average number of characters per token
     max_allowed_characters = max_allowed_tokens * characters_per_token
@@ -225,13 +226,13 @@ def main():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant who writes pull request descriptions",
+                    "content": "You are a helpful assistant who writes a readmme file",
                 },
                 {"role": "user", "content": model_sample_prompt},
                 {"role": "assistant", "content": model_sample_response},
                 {
                     "role": "user",
-                    "content": "Title of the pull request: " + pull_request_title,
+                    "content": "Title of the readme file: " + repo,
                 },
                 {"role": "user", "content": completion_prompt},
             ],
@@ -251,13 +252,13 @@ def main():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant who writes pull request descriptions",
+                    "content": "You are a helpful assistant who writes a readmme file",
                 },
                 {"role": "user", "content": model_sample_prompt},
                 {"role": "assistant", "content": model_sample_response},
                 {
                     "role": "user",
-                    "content": "Title of the pull request: " + pull_request_title,
+                    "content": "Title of the readme file: " + repo,
                 },
                 {"role": "user", "content": completion_prompt},
             ],
