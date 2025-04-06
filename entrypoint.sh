@@ -6,7 +6,7 @@ set -eu
 # Set fake value
 pull_request_id="0"
 
-/action/autofill_description.py \
+/action/autofill_readme.py \
   --github-api-url "$GITHUB_API_URL" \
   --github-repository "$GITHUB_REPOSITORY" \
   --pull-request-id "$pull_request_id" \
