@@ -18,15 +18,11 @@ To run the project, follow these steps:
    cd llm-generated-readme
    ```
 
-2. **Navigate to the Project Directory**:
-   ```bash
-   cd llm-generated-readme
-   ```
-
-3. **Run the Project**:
-   ```bash
-   python main.py
-   ```
+2. **Run the Project**:
+   Ensure you have Python installed on your system. Then, run the following command to start the main function:
+    ```bash
+    python main.py
+    ```
 
 ## Testing Instructions
 To run the tests for the project, follow these steps:
