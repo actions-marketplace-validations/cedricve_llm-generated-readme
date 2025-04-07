@@ -4,6 +4,8 @@ import requests
 import argparse
 import os
 import base64
+from openai import AzureOpenAI
+
 
 SAMPLE_PROMPT = """
 Write a README file that contains the following sections:
