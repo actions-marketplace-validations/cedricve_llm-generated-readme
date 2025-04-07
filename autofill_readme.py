@@ -5,7 +5,7 @@ import argparse
 import os
 import base64
 from openai import AzureOpenAI
-
+import datetime
 
 SAMPLE_PROMPT = """
 Write a README file that contains the following sections:
@@ -16,6 +16,7 @@ Write a README file that contains the following sections:
 - Testing instructions (how to run the tests; if there are any)
 - How to contribute to the project
 - License
+And that's it, no more sections.
 """
 
 GOOD_SAMPLE_RESPONSE = """
@@ -299,7 +300,8 @@ def main():
     print(f"Main branch SHA: {main_branch_sha}")
 
     # Create a new branch for the pull request
-    branch_name = "feature/add-readme-file"
+    # We include datetime in the branch name to avoid conflicts
+    branch_name = f"feature/add-readme-file-{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
     branch_url = f"{github_api_url}/repos/{repo}/git/refs"
     branch_data = {
         "ref": f"refs/heads/{branch_name}",
@@ -382,7 +384,7 @@ def main():
     # We will create a new pull request with the generated description in a new README.md file
     pr_title = f"Add README file for {repo}"
     pr_body = generated_pr_description
-    pr_branch = "feature/add-readme-file"
+    pr_branch = branch_name
     pr_base = "main"
     pr_head = pr_branch
     pr_url = f"{github_api_url}/repos/{repo}/pulls"

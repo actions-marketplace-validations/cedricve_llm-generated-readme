@@ -1,45 +1,45 @@
 name: 'Create a LLM generated README.md with (Azure) OpenAI'
-description: "Create a README.md file by analyzing repository functions using (Azure) OpenAI and ChatGPT."
+description: "Automatically create a stunning README.md file by harvesting your repostory functions combined with the power of (Azure) OpenAI and ChatGPT"
 inputs:
   github_token:
-    description: 'GitHub token for authentication.'
+    description: 'The GitHub token'
     required: true
   openai_api_key:
-    description: 'API key for OpenAI services.'
+    description: 'OpenAI API key'
     required: true
   azure_openai_api_key:
-    description: 'API key for Azure OpenAI services.'
+    description: 'Azure OpenAI API key'
     required: true
   openai_model:
-    description: 'OpenAI model for chat/completions endpoint.'
+    description: 'OpenAI model to use, needs to be compatible with the chat/completions endpoint'
     required: false
     default: 'gpt-4o-mini'
   azure_openai_endpoint:
-    description: 'Azure OpenAI endpoint URL.'
+    description: 'Azure OpenAI endpoint to use.'
     required: false
     default: ''
   azure_openai_version:
-    description: 'Azure OpenAI API version.'
+    description: 'Azure OpenAI version to use.'
     required: false
     default: ''
   max_tokens:
-    description: 'Max number of tokens for the prompt.'
+    description: 'Maximum number of prompt tokens to use'
     required: false
     default: '1000'
   temperature:
-    description: 'Model creativity level (higher = more creative).'
+    description: 'Temperature for the model, higher values will make the model more creative, lower values will make it more conservative'
     required: false
     default: '0.6'
   sample_prompt:
-    description: 'Sample prompt for the model (see SAMPLE_PROMPT in Python).'
+    description: 'Sample prompt to use for the model, refer to SAMPLE_PROMPT in the Python file.'
     required: false
     default: ''
   sample_response:
-    description: 'Ideal response sample for the sample prompt.'
+    description: 'A sample of an ideal response based on the sample prompt'
     required: false
     default: ''
   completion_prompt:
-    description: 'Final prompt for the model (see COMPLETION_PROMPT in Python).'
+    description: 'Prompt to use as the final prompt to the model, refer to COMPLETION_PROMPT in the Python file.'
     required: false
     default: ''
 runs:
