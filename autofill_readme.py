@@ -2,56 +2,100 @@
 import sys
 import requests
 import argparse
-import json
-import openai
-from openai import AzureOpenAI
 import os
+import base64
+from openai import AzureOpenAI
+
 
 SAMPLE_PROMPT = """
-Write a pull request description focusing on the motivation behind the change and why it improves the project.
-Go straight to the point.
-
-The title of the pull request is "Enable valgrind on CI" and the following changes took place:
-
-Changes in file .github/workflows/build-ut-coverage.yml: @@ -24,6 +24,7 @@ jobs:
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y lcov
-+          sudo apt-get install -y valgrind
-           sudo apt-get install -y ${{ matrix.compiler.cc }}
-           sudo apt-get install -y ${{ matrix.compiler.cxx }}
-       - name: Checkout repository
-@@ -48,3 +49,7 @@ jobs:
-         with:
-           files: coverage.info
-           fail_ci_if_error: true
-+      - name: Run valgrind
-+        run: |
-+          valgrind --tool=memcheck --leak-check=full --leak-resolution=med \
-+            --track-origins=yes --vgdb=no --error-exitcode=1 ${build_dir}/test/command_parser_test
-Changes in file test/CommandParserTest.cpp: @@ -566,7 +566,7 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsSupportedNumericTypeWill
-     unsigned long long expectedUnsignedLongLong { std::numeric_limits<unsigned long long>::max() };
-     float expectedFloat { -164223.123f }; // std::to_string does not play well with floating point min()
-     double expectedDouble { std::numeric_limits<double>::max() };
--    long double expectedLongDouble { std::numeric_limits<long double>::max() };
-+    long double expectedLongDouble { 123455678912349.1245678912349L };
-
-     auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
-                        .withArgs<int, long, unsigned long, long long, unsigned long long, float, double, long double>();
+Write a README file that contains the following sections:
+- repository name
+- overview (what is this repository about)
+- List of features
+- How to run the project, instructions (typically cloning the repository and running it, have a look at the .vscode directory)
+- Testing instructions (how to run the tests; if there are any)
+- How to contribute to the project
+- License
 """
 
 GOOD_SAMPLE_RESPONSE = """
-Currently, our CI build does not include Valgrind as part of the build and test process. Valgrind is a powerful tool for detecting memory errors, and its use is essential for maintaining the integrity of our project.
-This pull request adds Valgrind to the CI build, so that any memory errors will be detected and reported immediately. This will help to prevent undetected memory errors from making it into the production build.
+# cedricve/llm-generated-readme
 
-Overall, this change will improve the quality of the project by helping us detect and prevent memory errors.
+## Overview
+This project is designed to provide a comprehensive and user-friendly README template for your projects, generated using a language model. It aims to help developers quickly set up, understand, and contribute to their repositories with ease.
+
+## List of Features
+- **Automated README Generation**: Generate a detailed README file with essential sections for your repository.
+- **Clear Instructions**: Provides clear instructions on how to run the project and tests.
+- **Contribution Guidelines**: Offers guidelines on how to contribute to the project effectively.
+- **License Information**: Includes license details to ensure proper use and distribution.
+
+## How to Run the Project
+To run the project, follow these steps:
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/cedricve/llm-generated-readme.git
+   cd llm-generated-readme
+   ```
+
+3. **Run the Project**:
+    ```bash
+    python main.py
+    ```
+
+## Testing Instructions
+To run the tests for the project, follow these steps:
+
+1. **Navigate to the Tests Directory**:
+   ```bash
+   cd tests
+   ```
+
+2. **Run the Tests**:
+   Use the following command to run the tests:
+   ```bash
+   python -m unittest discover
+   ```
+
+## How to Contribute to the Project
+We welcome contributions to the `cedricve/llm-generated-readme` project! To contribute, please follow these guidelines:
+
+1. **Fork the Repository**:
+   Click the "Fork" button on the repository page to create a copy of the repository in your GitHub account.
+
+2. **Clone Your Fork**:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/llm-generated-readme.git
+   cd llm-generated-readme
+   ```
+
+3. **Create a New Branch**:
+   ```bash
+   git checkout -b feature-branch
+   ```
+
+4. **Make Your Changes**:
+   Implement your changes or additions.
+
+5. **Commit and Push**:
+   ```bash
+   git add .
+   git commit -m "Description of changes"
+   git push origin feature-branch
+   ```
+
+6. **Create a Pull Request**:
+   Navigate to the original repository and click "New Pull Request". Provide a detailed description of your changes and submit the pull request.
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 """
 
 COMPLETION_PROMPT = f"""
-Write a pull request description focusing on the motivation behind the change and why it improves the project.
-Go straight to the point. The following changes took place: \n
+Write a README file focusing on the motivation behind the entire repository and why it improves the project.
+Go straight to the point. The following files are included in the repository: \n
 """
-
 
 def main():
 
@@ -63,18 +107,6 @@ def main():
     )
     parser.add_argument(
         "--github-repository", type=str, required=True, help="The GitHub repository"
-    )
-    parser.add_argument(
-        "--pull-request-id",
-        type=int,
-        required=True,
-        help="The pull request ID",
-    )
-    parser.add_argument(
-        "--pull-request-url",
-        type=str,
-        required=True,
-        help="The pull request URL",
     )
     parser.add_argument(
         "--github-token",
@@ -106,29 +138,15 @@ def main():
         required=True,
         help="The Azure OpenAI API version",
     )
-    parser.add_argument(
-        "--allowed-users",
-        type=str,
-        required=False,
-        help="A comma-separated list of GitHub usernames that are allowed to trigger the action, empty or missing means all users are allowed",
-    )
     args = parser.parse_args()
 
     github_api_url = args.github_api_url
     repo = args.github_repository
     github_token = args.github_token
-    pull_request_id = args.pull_request_id
-    pull_request_url = args.pull_request_url
     openai_api_key = args.openai_api_key
     azure_openai_api_key = args.azure_openai_api_key
     azure_openai_endpoint = args.azure_openai_endpoint
     azure_openai_version = args.azure_openai_version
-
-    print("yolo")
-
-    allowed_users = os.environ.get("INPUT_ALLOWED_USERS", "")
-    if allowed_users:
-        allowed_users = allowed_users.split(",")
 
     open_ai_model = "gpt-4o"  # os.environ.get("INPUT_OPENAI_MODEL", "gpt-4o")
     max_prompt_tokens = int(os.environ.get("INPUT_MAX_TOKENS", "1000"))
@@ -145,69 +163,68 @@ def main():
         "Authorization": "token %s" % github_token,
     }
 
-    pull_request_api_url = f"{github_api_url}/repos/{repo}/pulls/{pull_request_id}"
-    pull_request_result = requests.get(
-        pull_request_api_url,
-        headers=authorization_header,
-    )
-    if pull_request_result.status_code != requests.codes.ok:
-        print(
-            "Request to get pull request data failed: "
-            + str(pull_request_result.status_code)
+    # Get all files in the main branch
+    repo_contents_url = f"{github_api_url}/repos/{repo}/contents"
+    files = []
+
+    def fetch_files(url):
+        response = requests.get(url, headers=authorization_header)
+        if response.status_code != 200:
+            print(f"Failed to fetch files: {response.status_code}, {response.text}")
+            return 
+        items = response.json()
+        for item in items:
+            if item["type"] == "file":
+                files.append(item["path"])
+            elif item["type"] == "dir":
+                fetch_files(item["url"])
+
+    fetch_files(repo_contents_url)
+
+    # Filter out .git, .devcontainer, .github, .venv, *.yml, Dockerfile, and .env files or directories
+    files = [
+        file for file in files
+        if not (
+            file.startswith(".git")
+            or file.startswith(".devcontainer")
+            or file.startswith(".github")
+            or file.startswith(".venv")
+            or file.endswith(".yml")
+            or file.endswith("Dockerfile")
+            or file.endswith(".env")
         )
-        print("Response: " + pull_request_result.text)
-        return 1
-    pull_request_data = json.loads(pull_request_result.text)
+    ]
 
-    overwrite_description = os.environ.get(
-        "INPUT_OVERWRITE_DESCRIPTION", "false")
-    if pull_request_data["body"] and overwrite_description.lower() == "false":
-        print("Pull request already has a description, skipping")
-        return 0
+    print(f"Files to process: {files}")
 
-    if allowed_users:
-        pr_author = pull_request_data["user"]["login"]
-        if pr_author not in allowed_users:
-            print(
-                f"Pull request author {pr_author} is not allowed to trigger this action"
-            )
-            return 0
-
-    pull_request_title = pull_request_data["title"]
-
-    pull_request_files = []
-    
-    # Request a maximum of 10 pages (300 files)
-    for page_num in range(1, 11):
-        pull_request_api_url = f"{pull_request_api_url}/files?page={page_num}&per_page=30"
-        pull_files_result = requests.get(
-            pull_request_api_url,
-            headers=authorization_header,
-        )
-
-        if pull_files_result.status_code != requests.codes.ok:
-            print(
-                "Request to get list of files failed with error code: "
-                + str(pull_files_result.status_code)
-            )
-            return 1
-
-        pull_files_chunk = json.loads(pull_files_result.text)
-
-        if len(pull_files_chunk) == 0:
-            break
-
-        pull_request_files.extend(pull_files_chunk)
-
-    for pull_request_file in pull_request_files:
-        # Not all PR file metadata entries may contain a patch section
-        # For example, entries related to removed binary files may not contain it
-        if "patch" not in pull_request_file:
+    decoded_files = []
+    for file in files:
+        # Get the content of the file
+        file_url = f"{github_api_url}/repos/{repo}/contents/{file}"
+        file_response = requests.get(file_url, headers=authorization_header)
+        if file_response.status_code != 200:
+            print(f"Failed to fetch file: {file_response.status_code}, {file_response.text}")
             continue
+        file_content = file_response.json()
+        file_content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
+        decoded_files.append(file_content_decoded)
 
-        filename = pull_request_file["filename"]
-        patch = pull_request_file["patch"]
-        completion_prompt += f"Changes in file {filename}: {patch}\n"
+    # Extract functions from the files
+    for file in decoded_files:
+        # Extract functions from the file content
+        lines = file.split("\n")
+        for index, line in enumerate(lines):
+            # for Python, we can use the keyword 'def' to identify functions
+            if line.strip().startswith("def "):
+                function_name = line.strip().split("(")[0][4:]
+                completion_prompt += f"Function: {function_name}\n"
+
+            # for Golang, we can use the keyword 'func' to identify functions
+            elif line.strip().startswith("func "):
+                function_name = line.strip().split("(")[0][5:]
+                completion_prompt += f"Function: {function_name}\n"
+
+    print(f"Completion prompt: {completion_prompt}")
 
     max_allowed_tokens = 8000
     characters_per_token = 4  # The average number of characters per token
@@ -223,13 +240,13 @@ def main():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant who writes pull request descriptions",
+                    "content": "You are a helpful assistant who writes a readmme file",
                 },
                 {"role": "user", "content": model_sample_prompt},
                 {"role": "assistant", "content": model_sample_response},
                 {
                     "role": "user",
-                    "content": "Title of the pull request: " + pull_request_title,
+                    "content": "Title of the readme file: " + repo,
                 },
                 {"role": "user", "content": completion_prompt},
             ],
@@ -249,13 +266,13 @@ def main():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant who writes pull request descriptions",
+                    "content": "You are a helpful assistant who writes professional readme file",
                 },
                 {"role": "user", "content": model_sample_prompt},
                 {"role": "assistant", "content": model_sample_response},
                 {
                     "role": "user",
-                    "content": "Title of the pull request: " + pull_request_title,
+                    "content": "Title of the readme file: " + repo,
                 },
                 {"role": "user", "content": completion_prompt},
             ],
@@ -264,44 +281,124 @@ def main():
         )
         generated_pr_description = azure_openai_response.choices[0].message.content
 
-    redundant_prefix = "This pull request "
-    if generated_pr_description.startswith(redundant_prefix):
-        generated_pr_description = generated_pr_description[len(
-            redundant_prefix):]
-        generated_pr_description = (
-            generated_pr_description[0].upper() + generated_pr_description[1:]
-        )
-    print(f"Generated pull request description: '{generated_pr_description}'")
+    # Get SHA of the main branch
+    branches_url = f"{github_api_url}/repos/{repo}/branches"
+    branches_response = requests.get(branches_url, headers=authorization_header)
+    if branches_response.status_code != 200:
+        print(f"Failed to fetch branches: {branches_response.status_code}, {branches_response.text}")
+        return
+    branches = branches_response.json()
+    main_branch_sha = None
+    for branch in branches:
+        if branch["name"] == "main":
+            main_branch_sha = branch["commit"]["sha"]
+            break
+    if main_branch_sha is None:
+        print("Main branch not found")
+        return
+    print(f"Main branch SHA: {main_branch_sha}")
 
-    title = "## Description\n\n"
-    generated_pr_description = title + generated_pr_description
+    # Create a new branch for the pull request
+    branch_name = "feature/add-readme-file"
+    branch_url = f"{github_api_url}/repos/{repo}/git/refs"
+    branch_data = {
+        "ref": f"refs/heads/{branch_name}",
+        "sha": main_branch_sha,
+    }
+    branch_response = requests.post(branch_url, headers=authorization_header, json=branch_data)
+    branch_exists = False
+    if branch_response.status_code != 201:
+        print(f"Failed to create branch: {branch_response.status_code}, {branch_response.text}")
+        # Might already exist
+        if branch_response.status_code == 422:
+            print("Branch already exists, continuing...")
+            branch_exists = True
+            branch_response = requests.get(branch_url, headers=authorization_header)
+            if branch_response.status_code != 200:
+                print(f"Failed to fetch branches: {branch_response.status_code}, {branch_response.text}")
+                return
+            branches = branch_response.json()
+            for branch in branches:
+                if branch["ref"] == f"refs/heads/{branch_name}":
+                    branch_sha = branch["object"]["sha"]
+                    break
+            else:
+                print("Branch not found")
+                return
+            print(f"Branch SHA: {branch_sha}")
+        else:
+            return
+    else:
+        branch_sha = branch_response.json()["object"]["sha"]
 
-    # We will prepend the pull_request_url.
-    if pull_request_url != "":
-        pull_request_url = f"Access the Pull Request environment [here]({pull_request_url})\n\n"
-        generated_pr_description = pull_request_url + generated_pr_description
-        title = "## Live Environment\n\n"
-        generated_pr_description = title + generated_pr_description
+    print(f"Branch created: {branch_name}")
 
-    issues_url = "%s/repos/%s/issues/%s" % (
-        github_api_url,
-        repo,
-        pull_request_id,
-    )
-    update_pr_description_result = requests.patch(
-        issues_url,
-        headers=authorization_header,
-        json={"body": generated_pr_description},
-    )
+    # Check if a README.md file already exists in the current branch, if so, get its SHA
+    readme_url = f"{github_api_url}/repos/{repo}/contents/README.md?ref={branch_name}"
+    readme_response = requests.get(readme_url, headers=authorization_header)
+    readme_sha = None
+    if readme_response.status_code == 200:
+        readme_sha = readme_response.json()["sha"]
+        print(f"README.md already exists in branch {branch_name} with SHA: {readme_sha}")
+    elif readme_response.status_code == 404:
+        print(f"README.md does not exist in branch {branch_name}, creating a new one")
+    else:
+        print(f"Failed to fetch README.md in branch {branch_name}: {readme_response.status_code}, {readme_response.text}")
+        return
 
-    if update_pr_description_result.status_code != requests.codes.ok:
-        print(
-            "Request to update pull request description failed: "
-            + str(update_pr_description_result.status_code)
-        )
-        print("Response: " + update_pr_description_result.text)
-        return 1
+    # Create a new file in the new branch
+    file_path = "README.md"
+    file_url = f"{github_api_url}/repos/{repo}/contents/{file_path}"
+    file_data = {
+        "content": base64.b64encode(generated_pr_description.encode("utf-8")).decode("utf-8"),
+        "branch": branch_name,
+    }
+    if readme_sha:
+        file_data["sha"] = readme_sha
+        file_data["message"] = "Update README file"
+    else:
+        file_data["message"] = "Create README file"
 
+    file_response = requests.put(file_url, headers=authorization_header, json=file_data)
+    if file_response.status_code not in [200, 201]:
+        print(f"Failed to create file: {file_response.status_code}, {file_response.text}")
+        return
+    file_sha = file_response.json()["content"]["sha"]
+    print(f"File created: {file_path}")
 
+    # Check if the pull request already exists for this branch
+    pull_requests_url = f"{github_api_url}/repos/{repo}/pulls"
+    pull_requests_response = requests.get(pull_requests_url, headers=authorization_header)
+    if pull_requests_response.status_code != 200:
+        print(f"Failed to fetch pull requests: {pull_requests_response.status_code}, {pull_requests_response.text}")
+        return
+    pull_requests = pull_requests_response.json()
+    for pull_request in pull_requests:
+        if pull_request["head"]["ref"] == branch_name:
+            print(f"Pull request already exists: {pull_request['html_url']}")
+            return
+        
+    print("No existing pull request found, creating a new one")
+    # We will create a new pull request with the generated description in a new README.md file
+    pr_title = f"Add README file for {repo}"
+    pr_body = generated_pr_description
+    pr_branch = "feature/add-readme-file"
+    pr_base = "main"
+    pr_head = pr_branch
+    pr_url = f"{github_api_url}/repos/{repo}/pulls"
+    pr_data = {
+        "title": pr_title,
+        "body": pr_body,
+        "head": pr_head,
+        "base": pr_base,
+    }
+    pr_response = requests.post(pr_url, headers=authorization_header, json=pr_data)
+    if pr_response.status_code != 201:
+        print(f"Failed to create pull request: {pr_response.status_code}, {pr_response.text}")
+        return
+    pr_number = pr_response.json()["number"]
+    pr_url = pr_response.json()["html_url"]
+    print(f"Pull request created: {pr_url}")
+    
 if __name__ == "__main__":
     sys.exit(main())

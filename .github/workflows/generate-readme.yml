@@ -4,7 +4,7 @@ on:
   workflow_dispatch: 
 
 jobs:
-  openai-pr-description:
+  generate-readme:
     runs-on: ubuntu-22.04
 
     steps:  
