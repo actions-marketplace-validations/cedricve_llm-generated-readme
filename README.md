@@ -19,7 +19,6 @@ To run the project, follow these steps:
    ```
 
 2. **Run the Project**:
-   Ensure you have Python installed on your system. Then, run the following command to start the main function:
     ```bash
     python main.py
     ```
