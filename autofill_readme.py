@@ -266,7 +266,7 @@ def main():
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant who writes a readmme file",
+                    "content": "You are a helpful assistant who writes professional readme file",
                 },
                 {"role": "user", "content": model_sample_prompt},
                 {"role": "assistant", "content": model_sample_response},
@@ -306,27 +306,79 @@ def main():
         "sha": main_branch_sha,
     }
     branch_response = requests.post(branch_url, headers=authorization_header, json=branch_data)
+    branch_exists = False
     if branch_response.status_code != 201:
         print(f"Failed to create branch: {branch_response.status_code}, {branch_response.text}")
-        return
-    branch_sha = branch_response.json()["object"]["sha"]
+        # Might already exist
+        if branch_response.status_code == 422:
+            print("Branch already exists, continuing...")
+            branch_exists = True
+            branch_response = requests.get(branch_url, headers=authorization_header)
+            if branch_response.status_code != 200:
+                print(f"Failed to fetch branches: {branch_response.status_code}, {branch_response.text}")
+                return
+            branches = branch_response.json()
+            for branch in branches:
+                if branch["ref"] == f"refs/heads/{branch_name}":
+                    branch_sha = branch["object"]["sha"]
+                    break
+            else:
+                print("Branch not found")
+                return
+            print(f"Branch SHA: {branch_sha}")
+        else:
+            return
+    else:
+        branch_sha = branch_response.json()["object"]["sha"]
+
     print(f"Branch created: {branch_name}")
+
+    # Check if a README.md file already exists in the current branch, if so, get its SHA
+    readme_url = f"{github_api_url}/repos/{repo}/contents/README.md?ref={branch_name}"
+    readme_response = requests.get(readme_url, headers=authorization_header)
+    readme_sha = None
+    if readme_response.status_code == 200:
+        readme_sha = readme_response.json()["sha"]
+        print(f"README.md already exists in branch {branch_name} with SHA: {readme_sha}")
+    elif readme_response.status_code == 404:
+        print(f"README.md does not exist in branch {branch_name}, creating a new one")
+    else:
+        print(f"Failed to fetch README.md in branch {branch_name}: {readme_response.status_code}, {readme_response.text}")
+        return
 
     # Create a new file in the new branch
     file_path = "README.md"
     file_url = f"{github_api_url}/repos/{repo}/contents/{file_path}"
     file_data = {
-        "message": "Add README file",
         "content": base64.b64encode(generated_pr_description.encode("utf-8")).decode("utf-8"),
         "branch": branch_name,
     }
+    if readme_sha:
+        file_data["sha"] = readme_sha
+        file_data["message"] = "Update README file"
+    else:
+        file_data["message"] = "Create README file"
+
     file_response = requests.put(file_url, headers=authorization_header, json=file_data)
-    if file_response.status_code != 201:
+    if file_response.status_code not in [200, 201]:
         print(f"Failed to create file: {file_response.status_code}, {file_response.text}")
         return
     file_sha = file_response.json()["content"]["sha"]
     print(f"File created: {file_path}")
 
+    # Check if the pull request already exists for this branch
+    pull_requests_url = f"{github_api_url}/repos/{repo}/pulls"
+    pull_requests_response = requests.get(pull_requests_url, headers=authorization_header)
+    if pull_requests_response.status_code != 200:
+        print(f"Failed to fetch pull requests: {pull_requests_response.status_code}, {pull_requests_response.text}")
+        return
+    pull_requests = pull_requests_response.json()
+    for pull_request in pull_requests:
+        if pull_request["head"]["ref"] == branch_name:
+            print(f"Pull request already exists: {pull_request['html_url']}")
+            return
+        
+    print("No existing pull request found, creating a new one")
     # We will create a new pull request with the generated description in a new README.md file
     pr_title = f"Add README file for {repo}"
     pr_body = generated_pr_description
