@@ -19,9 +19,9 @@ To run the project, follow these steps:
    ```
 
 2. **Run the Project**:
-   ```bash
-   python main.py
-   ```
+    ```bash
+    python main.py
+    ```
 
 ## Testing Instructions
 To run the tests for the project, follow these steps:
