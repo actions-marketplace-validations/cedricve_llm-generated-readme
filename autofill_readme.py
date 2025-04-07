@@ -9,50 +9,94 @@ import os
 import base64
 
 SAMPLE_PROMPT = """
-Write a pull request description focusing on the motivation behind the change and why it improves the project.
-Go straight to the point.
-
-The title of the pull request is "Enable valgrind on CI" and the following changes took place:
-
-Changes in file .github/workflows/build-ut-coverage.yml: @@ -24,6 +24,7 @@ jobs:
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y lcov
-+          sudo apt-get install -y valgrind
-           sudo apt-get install -y ${{ matrix.compiler.cc }}
-           sudo apt-get install -y ${{ matrix.compiler.cxx }}
-       - name: Checkout repository
-@@ -48,3 +49,7 @@ jobs:
-         with:
-           files: coverage.info
-           fail_ci_if_error: true
-+      - name: Run valgrind
-+        run: |
-+          valgrind --tool=memcheck --leak-check=full --leak-resolution=med \
-+            --track-origins=yes --vgdb=no --error-exitcode=1 ${build_dir}/test/command_parser_test
-Changes in file test/CommandParserTest.cpp: @@ -566,7 +566,7 @@ TEST(CommandParserTest, ParsedCommandImpl_WhenArgumentIsSupportedNumericTypeWill
-     unsigned long long expectedUnsignedLongLong { std::numeric_limits<unsigned long long>::max() };
-     float expectedFloat { -164223.123f }; // std::to_string does not play well with floating point min()
-     double expectedDouble { std::numeric_limits<double>::max() };
--    long double expectedLongDouble { std::numeric_limits<long double>::max() };
-+    long double expectedLongDouble { 123455678912349.1245678912349L };
-
-     auto command = UnparsedCommand::create(expectedCommand, "dummyDescription"s)
-                        .withArgs<int, long, unsigned long, long long, unsigned long long, float, double, long double>();
+Write a README file that contains the following sections:
+- repository name
+- overview (what is this repository about)
+- List of features
+- How to run the project, instructions (typically cloning the repository and running it, have a look at the .vscode directory)
+- Testing instructions (how to run the tests; if there are any)
+- How to contribute to the project
+- License
 """
 
 GOOD_SAMPLE_RESPONSE = """
-Currently, our CI build does not include Valgrind as part of the build and test process. Valgrind is a powerful tool for detecting memory errors, and its use is essential for maintaining the integrity of our project.
-This pull request adds Valgrind to the CI build, so that any memory errors will be detected and reported immediately. This will help to prevent undetected memory errors from making it into the production build.
+# cedricve/llm-generated-readme
 
-Overall, this change will improve the quality of the project by helping us detect and prevent memory errors.
+## Overview
+This project is designed to provide a comprehensive and user-friendly README template for your projects, generated using a language model. It aims to help developers quickly set up, understand, and contribute to their repositories with ease.
+
+## List of Features
+- **Automated README Generation**: Generate a detailed README file with essential sections for your repository.
+- **Clear Instructions**: Provides clear instructions on how to run the project and tests.
+- **Contribution Guidelines**: Offers guidelines on how to contribute to the project effectively.
+- **License Information**: Includes license details to ensure proper use and distribution.
+
+## How to Run the Project
+To run the project, follow these steps:
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/cedricve/llm-generated-readme.git
+   cd llm-generated-readme
+   ```
+
+3. **Run the Project**:
+    ```bash
+    python main.py
+    ```
+
+## Testing Instructions
+To run the tests for the project, follow these steps:
+
+1. **Navigate to the Tests Directory**:
+   ```bash
+   cd tests
+   ```
+
+2. **Run the Tests**:
+   Use the following command to run the tests:
+   ```bash
+   python -m unittest discover
+   ```
+
+## How to Contribute to the Project
+We welcome contributions to the `cedricve/llm-generated-readme` project! To contribute, please follow these guidelines:
+
+1. **Fork the Repository**:
+   Click the "Fork" button on the repository page to create a copy of the repository in your GitHub account.
+
+2. **Clone Your Fork**:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/llm-generated-readme.git
+   cd llm-generated-readme
+   ```
+
+3. **Create a New Branch**:
+   ```bash
+   git checkout -b feature-branch
+   ```
+
+4. **Make Your Changes**:
+   Implement your changes or additions.
+
+5. **Commit and Push**:
+   ```bash
+   git add .
+   git commit -m "Description of changes"
+   git push origin feature-branch
+   ```
+
+6. **Create a Pull Request**:
+   Navigate to the original repository and click "New Pull Request". Provide a detailed description of your changes and submit the pull request.
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 """
 
 COMPLETION_PROMPT = f"""
-Write a pull request description focusing on the motivation behind the change and why it improves the project.
-Go straight to the point. The following changes took place: \n
+Write a README file focusing on the motivation behind the entire repository and why it improves the project.
+Go straight to the point. The following files are included in the repository: \n
 """
-
 
 def main():
 
@@ -64,18 +108,6 @@ def main():
     )
     parser.add_argument(
         "--github-repository", type=str, required=True, help="The GitHub repository"
-    )
-    parser.add_argument(
-        "--pull-request-id",
-        type=int,
-        required=True,
-        help="The pull request ID",
-    )
-    parser.add_argument(
-        "--pull-request-url",
-        type=str,
-        required=True,
-        help="The pull request URL",
     )
     parser.add_argument(
         "--github-token",
@@ -118,8 +150,6 @@ def main():
     github_api_url = args.github_api_url
     repo = args.github_repository
     github_token = args.github_token
-    pull_request_id = args.pull_request_id
-    pull_request_url = args.pull_request_url
     openai_api_key = args.openai_api_key
     azure_openai_api_key = args.azure_openai_api_key
     azure_openai_endpoint = args.azure_openai_endpoint
@@ -162,19 +192,21 @@ def main():
 
     fetch_files(repo_contents_url)
 
-    # Filter out .git, .devcontainer, .github, .venv, *.yml, Dockerfile, and .env files
+    # Filter out .git, .devcontainer, .github, .venv, *.yml, Dockerfile, and .env files or directories
     files = [
         file for file in files
         if not (
-            file.endswith(".git")
-            or file.endswith(".devcontainer")
-            or file.endswith(".github")
-            or file.endswith(".venv")
+            file.startswith(".git")
+            or file.startswith(".devcontainer")
+            or file.startswith(".github")
+            or file.startswith(".venv")
             or file.endswith(".yml")
             or file.endswith("Dockerfile")
             or file.endswith(".env")
         )
     ]
+
+    print(f"Files to process: {files}")
 
     decoded_files = []
     for file in files:
@@ -187,7 +219,7 @@ def main():
         file_content = file_response.json()
         file_content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
         decoded_files.append(file_content_decoded)
-    
+
     # Extract functions from the files
     for file in decoded_files:
         # Extract functions from the file content
@@ -197,21 +229,14 @@ def main():
             if line.strip().startswith("def "):
                 function_name = line.strip().split("(")[0][4:]
                 completion_prompt += f"Function: {function_name}\n"
-                # Get first 10 lines of the function
-                function_lines = lines[index:index+100]
-                completion_prompt += f"Function lines: {function_lines}\n"
 
             # for Golang, we can use the keyword 'func' to identify functions
             elif line.strip().startswith("func "):
                 function_name = line.strip().split("(")[0][5:]
                 completion_prompt += f"Function: {function_name}\n"
-                function_lines = lines[index:index+100]
-                completion_prompt += f"Function lines: {function_lines}\n"
 
     print(f"Completion prompt: {completion_prompt}")
 
-
-    #completion_prompt += f"Changes in file {filename}: {patch}\n"
     max_allowed_tokens = 8000
     characters_per_token = 4  # The average number of characters per token
     max_allowed_characters = max_allowed_tokens * characters_per_token
@@ -267,44 +292,72 @@ def main():
         )
         generated_pr_description = azure_openai_response.choices[0].message.content
 
-    redundant_prefix = "This pull request "
-    if generated_pr_description.startswith(redundant_prefix):
-        generated_pr_description = generated_pr_description[len(
-            redundant_prefix):]
-        generated_pr_description = (
-            generated_pr_description[0].upper() + generated_pr_description[1:]
-        )
-    print(f"Generated pull request description: '{generated_pr_description}'")
+    # Get SHA of the main branch
+    branches_url = f"{github_api_url}/repos/{repo}/branches"
+    branches_response = requests.get(branches_url, headers=authorization_header)
+    if branches_response.status_code != 200:
+        print(f"Failed to fetch branches: {branches_response.status_code}, {branches_response.text}")
+        return
+    branches = branches_response.json()
+    main_branch_sha = None
+    for branch in branches:
+        if branch["name"] == "main":
+            main_branch_sha = branch["commit"]["sha"]
+            break
+    if main_branch_sha is None:
+        print("Main branch not found")
+        return
+    print(f"Main branch SHA: {main_branch_sha}")
 
-    title = "## Description\n\n"
-    generated_pr_description = title + generated_pr_description
+    # Create a new branch for the pull request
+    branch_name = "feature/add-readme-file"
+    branch_url = f"{github_api_url}/repos/{repo}/git/refs"
+    branch_data = {
+        "ref": f"refs/heads/{branch_name}",
+        "sha": main_branch_sha,
+    }
+    branch_response = requests.post(branch_url, headers=authorization_header, json=branch_data)
+    if branch_response.status_code != 201:
+        print(f"Failed to create branch: {branch_response.status_code}, {branch_response.text}")
+        return
+    branch_sha = branch_response.json()["object"]["sha"]
+    print(f"Branch created: {branch_name}")
 
-    # We will prepend the pull_request_url.
-    if pull_request_url != "":
-        pull_request_url = f"Access the Pull Request environment [here]({pull_request_url})\n\n"
-        generated_pr_description = pull_request_url + generated_pr_description
-        title = "## Live Environment\n\n"
-        generated_pr_description = title + generated_pr_description
+    # Create a new file in the new branch
+    file_path = "README.md"
+    file_url = f"{github_api_url}/repos/{repo}/contents/{file_path}"
+    file_data = {
+        "message": "Add README file",
+        "content": base64.b64encode(generated_pr_description.encode("utf-8")).decode("utf-8"),
+        "branch": branch_name,
+    }
+    file_response = requests.put(file_url, headers=authorization_header, json=file_data)
+    if file_response.status_code != 201:
+        print(f"Failed to create file: {file_response.status_code}, {file_response.text}")
+        return
+    file_sha = file_response.json()["content"]["sha"]
+    print(f"File created: {file_path}")
 
-    issues_url = "%s/repos/%s/issues/%s" % (
-        github_api_url,
-        repo,
-        pull_request_id,
-    )
-    update_pr_description_result = requests.patch(
-        issues_url,
-        headers=authorization_header,
-        json={"body": generated_pr_description},
-    )
-
-    if update_pr_description_result.status_code != requests.codes.ok:
-        print(
-            "Request to update pull request description failed: "
-            + str(update_pr_description_result.status_code)
-        )
-        print("Response: " + update_pr_description_result.text)
-        return 1
-
-
+    # We will create a new pull request with the generated description in a new README.md file
+    pr_title = f"Add README file for {repo}"
+    pr_body = generated_pr_description
+    pr_branch = "feature/add-readme-file"
+    pr_base = "main"
+    pr_head = pr_branch
+    pr_url = f"{github_api_url}/repos/{repo}/pulls"
+    pr_data = {
+        "title": pr_title,
+        "body": pr_body,
+        "head": pr_head,
+        "base": pr_base,
+    }
+    pr_response = requests.post(pr_url, headers=authorization_header, json=pr_data)
+    if pr_response.status_code != 201:
+        print(f"Failed to create pull request: {pr_response.status_code}, {pr_response.text}")
+        return
+    pr_number = pr_response.json()["number"]
+    pr_url = pr_response.json()["html_url"]
+    print(f"Pull request created: {pr_url}")
+    
 if __name__ == "__main__":
     sys.exit(main())
