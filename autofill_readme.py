@@ -2,9 +2,6 @@
 import sys
 import requests
 import argparse
-import json
-import openai
-from openai import AzureOpenAI
 import os
 import base64
 
