@@ -20,7 +20,7 @@ To run the project, follow these steps:
 
 2. **Navigate to the Project Directory**:
    ```bash
-   cd src
+   cd llm-generated-readme
    ```
 
 3. **Run the Project**:
