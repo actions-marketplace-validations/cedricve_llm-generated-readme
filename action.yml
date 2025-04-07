@@ -1,5 +1,5 @@
-name: 'Autofill PR Description with (Azure) OpenAI'
-description: "Autofill you pull request with a high quality description by harvesting the power of (Azure) OpenAI and ChatGPT"
+name: 'Create a LLM generated README.md with (Azure) OpenAI'
+description: "Automatically create a stunning README.md file by harvesting your repostory functions combined with the power of (Azure) OpenAI and ChatGPT"
 inputs:
   github_token:
     description: 'The GitHub token'
@@ -10,18 +10,6 @@ inputs:
   azure_openai_api_key:
     description: 'Azure OpenAI API key'
     required: true
-  pull_request_id:
-    description: 'Pull request id (otherwise attempt to extract it from the GitHub metadata)'
-    required: false
-    default: ''
-  pull_request_url:
-    description: 'Pull request URL (otherwise attempt to extract it from the GitHub metadata)'
-    required: false
-    default: ''
-  allowed_users:
-    description: 'Comma-separated list of GitHub usernames this action will run for, if empty it will run for all users'
-    required: false
-    default: ''
   openai_model:
     description: 'OpenAI model to use, needs to be compatible with the chat/completions endpoint'
     required: false
@@ -54,11 +42,6 @@ inputs:
     description: 'Prompt to use as the final prompt to the model, refer to COMPLETION_PROMPT in the Python file.'
     required: false
     default: ''
-  overwrite_description:
-    description: 'Overwrite the PR description if it already exists. This also means that the action will run on every PR update'
-    required: false
-    default: 'false'
-
 runs:
   using: 'docker'
   image: 'Dockerfile'
