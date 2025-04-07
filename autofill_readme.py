@@ -136,12 +136,6 @@ def main():
         required=True,
         help="The Azure OpenAI API version",
     )
-    parser.add_argument(
-        "--allowed-users",
-        type=str,
-        required=False,
-        help="A comma-separated list of GitHub usernames that are allowed to trigger the action, empty or missing means all users are allowed",
-    )
     args = parser.parse_args()
 
     github_api_url = args.github_api_url
@@ -151,10 +145,6 @@ def main():
     azure_openai_api_key = args.azure_openai_api_key
     azure_openai_endpoint = args.azure_openai_endpoint
     azure_openai_version = args.azure_openai_version
-
-    allowed_users = os.environ.get("INPUT_ALLOWED_USERS", "")
-    if allowed_users:
-        allowed_users = allowed_users.split(",")
 
     open_ai_model = "gpt-4o"  # os.environ.get("INPUT_OPENAI_MODEL", "gpt-4o")
     max_prompt_tokens = int(os.environ.get("INPUT_MAX_TOKENS", "1000"))
