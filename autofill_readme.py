@@ -207,7 +207,7 @@ def main():
             print(f"Failed to fetch file: {file_response.status_code}, {file_response.text}")
             continue
         file_content = file_response.json()
-        file_content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
+        file_content_decoded = base64.b64decode(file_content["content"]).decode("utf-8", errors="replace")
         decoded_files.append(file_content_decoded)
 
     # Extract functions from the files
