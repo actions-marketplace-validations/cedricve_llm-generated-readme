@@ -1,4 +1,4 @@
-FROM python:3.11-slim-buster
+FROM python:3.13.5-bullseye
 
 RUN apt-get update
 RUN apt-get -y install jq
